@@ -1,0 +1,164 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# author:yiluzhang
+"""
+Reinforcement learning maze example.
+
+Red rectangle:          explorer.
+Black rectangles:       hells       [reward = -1].
+Yellow bin circle:      paradise    [reward = +1].
+All other states:       ground      [reward = 0].
+
+This script is the environment part of this example. The RL is in RL_brain.py.
+
+View more on my tutorial page: https://morvanzhou.github.io/tutorials/
+"""
+
+
+import numpy as np
+import time
+import sys
+if sys.version_info.major == 2:
+    import Tkinter as tk
+else:
+    import tkinter as tk
+
+
+UNIT = 40   # pixels,the size of one grid
+MAZE_H = 6  # grid height
+MAZE_W = 6  # grid width
+
+
+class Maze(tk.Tk, object):
+    def __init__(self):
+        super(Maze, self).__init__()   # 调用超类初始化
+        self.action_space = ['u', 'd', 'l', 'r']   # up,down,left,right
+        self.n_actions = len(self.action_space)    # number of action
+        self.title('maze')
+        self.geometry('{0}x{1}'.format(MAZE_H * UNIT, MAZE_H * UNIT))  # Tkinter 的几何形状
+        self._build_maze()
+
+    def _build_maze(self):
+        self.canvas = tk.Canvas(self, bg='white',
+                           height=MAZE_H * UNIT,
+                           width=MAZE_W * UNIT)
+
+        # create grids
+        for c in range(0, MAZE_W * UNIT, UNIT):
+            x0, y0, x1, y1 = c, 0, c, MAZE_W * UNIT
+            self.canvas.create_line(x0, y0, x1, y1)
+        for r in range(0, MAZE_H * UNIT, UNIT):
+            x0, y0, x1, y1 = 0, r, MAZE_H * UNIT, r
+            self.canvas.create_line(x0, y0, x1, y1)
+
+        # create origin
+        origin = np.array([20, 20])
+
+        # hell,black point
+        hell1_center = origin + np.array([UNIT * 2, UNIT])
+        self.hell1 = self.canvas.create_rectangle(
+            hell1_center[0] - 15, hell1_center[1] - 15,
+            hell1_center[0] + 15, hell1_center[1] + 15,
+            fill='black')
+        # hell,black point
+        hell2_center = origin + np.array([UNIT, UNIT * 2])
+        self.hell2 = self.canvas.create_rectangle(
+            hell2_center[0] - 15, hell2_center[1] - 15,
+            hell2_center[0] + 15, hell2_center[1] + 15,
+            fill='black')
+        # hell,black point
+        hell3_center = origin + np.array([UNIT * 2, UNIT * 3])
+        self.hell3 = self.canvas.create_rectangle(
+            hell3_center[0] - 15, hell3_center[1] - 15,
+            hell3_center[0] + 15, hell3_center[1] + 15,
+            fill='black')
+
+        # create oval
+        oval_center = origin + UNIT * 2
+        self.oval = self.canvas.create_oval(
+            oval_center[0] - 15, oval_center[1] - 15,
+            oval_center[0] + 15, oval_center[1] + 15,
+            fill='yellow')
+
+        # create red rect
+        self.rect = self.canvas.create_rectangle(
+            origin[0] - 15, origin[1] - 15,
+            origin[0] + 15, origin[1] + 15,
+            fill='red')
+
+        # pack all
+        self.canvas.pack()
+    # let red rect go back to (1,1)grid
+    def reset(self):
+        self.update()
+        time.sleep(0.5)  # delay execution for 0.5s
+        self.canvas.delete(self.rect)
+        # define core of red,起点正方形对角坐标分别为 (5，5) 和 (35, 35),为了给边缘留5个像素空隙
+        origin = np.array([20, 20])
+        self.rect = self.canvas.create_rectangle(
+            origin[0] - 15, origin[1] - 15,
+            origin[0] + 15, origin[1] + 15,
+            fill='red')
+        # return observation
+        return self.canvas.coords(self.rect)
+
+    def step(self, action):
+        s = self.canvas.coords(self.rect)
+        base_action = np.array([0, 0])
+
+        # only move in one aix
+        if action == 0:   # up
+            # if on the top edge, it can't move up
+            if s[1] > UNIT:
+                base_action[1] -= UNIT
+        elif action == 1:   # down
+            if s[1] < (MAZE_H - 1) * UNIT:
+                base_action[1] += UNIT
+        elif action == 2:   # right
+            if s[0] < (MAZE_W - 1) * UNIT:
+                base_action[0] += UNIT
+        elif action == 3:   # left
+            if s[0] > UNIT:
+                base_action[0] -= UNIT
+
+        self.canvas.move(self.rect, base_action[0], base_action[1])  # move agent
+
+        s_ = self.canvas.coords(self.rect)  # next state
+
+        # reward function
+        # yellow rect
+        if s_ == self.canvas.coords(self.oval):
+            reward = 1
+            done = True
+            s_ = 'terminal'
+
+        # black rect
+        elif s_ in [self.canvas.coords(self.hell1), self.canvas.coords(self.hell2),self.canvas.coords(self.hell3)]:
+            reward = -1
+            done = True
+            s_ = 'terminal'
+        else:
+            reward = -0.02  # previous 0
+            done = False
+
+        return s_, reward, done
+
+    def render(self):
+        time.sleep(0.1)
+        self.update()
+
+
+def update():
+    for t in range(10):
+        # s = env.reset()
+        while True:
+            env.render()
+            a = 1
+            s, r, done = env.step(a)
+            if done:
+                break
+
+# if __name__ == '__main__':
+#     env = Maze()
+#     env.after(100, update)
+#     env.mainloop()
